@@ -420,18 +420,28 @@ The connection persists while you use other tools. A badge in the top bar shows 
       btn.disabled = true;
       btn.textContent = 'Connecting…';
       pc.addEventListener('iceconnectionstatechange', () => {
+        console.log('[p2p] iceConnectionState:', pc.iceConnectionState);
         if (err.isConnected) return;
         err.textContent = `ICE: ${pc.iceConnectionState}`;
         if (['connected','completed'].includes(pc.iceConnectionState)) err.isConnected = true;
       });
+      pc.addEventListener('connectionstatechange', () => {
+        console.log('[p2p] connectionState:', pc.connectionState);
+      });
       try {
+        console.log('[p2p] parsed ok, type:', parsed.type, 'sdp len:', parsed.sdp?.length);
         const peerPub = await importPub(parsed.pub);
         const key = await deriveSharedKey(self._kp.privateKey, peerPub);
         const peer = self._peers.get(peerId);
         peer.key = key;
         self._bindDC(peerId, dc);
+        console.log('[p2p] calling setRemoteDescription, signalingState:', pc.signalingState);
         await pc.setRemoteDescription({ type: parsed.type, sdp: parsed.sdp });
-      } catch(e) { btn.disabled = false; btn.textContent = 'Connect →'; mainEl.querySelector('#p2p-err').textContent = e.message; }
+        console.log('[p2p] setRemoteDescription done, signalingState:', pc.signalingState, 'iceGatheringState:', pc.iceGatheringState);
+      } catch(e) {
+        console.error('[p2p] connect error:', e);
+        btn.disabled = false; btn.textContent = 'Connect →'; mainEl.querySelector('#p2p-err').textContent = e.message;
+      }
     });
 
     mainEl.querySelector('#p2p-to-receiver').addEventListener('click', () => {
@@ -537,10 +547,12 @@ The connection persists while you use other tools. A badge in the top bar shows 
     const onConn = () => { if (connFired) return; connFired = true; self._onConnected(peerId); };
     const onDrop = () => { if (dropFired) return; dropFired = true; self._onDropped(peerId); };
     pc.addEventListener('connectionstatechange', () => {
+      console.log('[p2p] watchConn connectionState:', pc.connectionState);
       if (pc.connectionState === 'connected') onConn();
       if (['failed','closed'].includes(pc.connectionState)) onDrop();
     });
     pc.addEventListener('iceconnectionstatechange', () => {
+      console.log('[p2p] watchConn iceConnectionState:', pc.iceConnectionState);
       if (['connected','completed'].includes(pc.iceConnectionState)) onConn();
       if (pc.iceConnectionState === 'failed') onDrop();
     });
