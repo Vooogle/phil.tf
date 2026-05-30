@@ -42,7 +42,12 @@ function fmt(n) { return n < 1024 ? `${n}B` : n < 1048576 ? `${(n/1024).toFixed(
 function encBlob(desc, pub) { return btoa(JSON.stringify({ type: desc.type, sdp: desc.sdp, pub })); }
 function decBlob(s) { try { return JSON.parse(atob(s.trim())); } catch { return null; } }
 
-const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+const ICE = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  { urls: 'stun:stun.services.mozilla.com' },
+] };
 const CHUNK = 12 * 1024;
 
 async function gatherIce(pc) {
@@ -109,7 +114,8 @@ The connection persists while you use other tools. A badge in the top bar shows 
   _myName: '',
   _analysers: null,   // Map<peerId, { ctx, analyser }>
   _myAnalyser: null,
-  _streamRes: '1080p',
+  _streamRes: 1.0,
+  _streamFps: 30,
   _mainEl: null,
   _previewEl: null,
   _cleanups: [],
@@ -132,6 +138,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
       this._analysers  = _live.analysers;
       this._myAnalyser = _live.myAnalyser;
       this._streamRes  = _live.streamRes;
+      this._streamFps  = _live.streamFps;
       _live = null;
       this._mountConnected();
       injectGuide(mainEl, this.guide);
@@ -159,7 +166,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
   destroy() {
     const isLive = this._peers && [...this._peers.values()].some(p => p.pc?.connectionState === 'connected');
     if (isLive) {
-      _live = { kp: this._kp, pub: this._pub, peers: this._peers, mic: this._mic, screen: this._screen, micMuted: this._micMuted, audMuted: this._audMuted, myName: this._myName, analysers: this._analysers, myAnalyser: this._myAnalyser, streamRes: this._streamRes };
+      _live = { kp: this._kp, pub: this._pub, peers: this._peers, mic: this._mic, screen: this._screen, micMuted: this._micMuted, audMuted: this._audMuted, myName: this._myName, analysers: this._analysers, myAnalyser: this._myAnalyser, streamRes: this._streamRes, streamFps: this._streamFps };
       this._cleanups.forEach(fn => fn()); this._cleanups = [];
       this._mainEl = null; this._previewEl = null;
       // Badge stays - connection is live
@@ -463,7 +470,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
       pc.addEventListener('track', e => self._onTrack(peerId, e));
       pc.addEventListener('connectionstatechange', () => {
         if (pc.connectionState === 'connected') self._onConnected(peerId);
-        if (['failed','disconnected','closed'].includes(pc.connectionState)) self._onDropped(peerId);
+        if (['failed','closed'].includes(pc.connectionState)) self._onDropped(peerId);
       });
 
       await pc.setRemoteDescription({ type: parsed.type, sdp: parsed.sdp });
@@ -498,7 +505,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
     pc.addEventListener('track', e => self._onTrack(peerId, e));
     pc.addEventListener('connectionstatechange', () => {
       if (pc.connectionState === 'connected') self._onConnected(peerId);
-      if (['failed','disconnected','closed'].includes(pc.connectionState)) self._onDropped(peerId);
+      if (['failed','closed'].includes(pc.connectionState)) self._onDropped(peerId);
     });
     return { peerId, pc, dc };
   },
@@ -597,17 +604,23 @@ The connection persists while you use other tools. A badge in the top bar shows 
         const peer = self._peers.get(peerId);
         if (!peer) return;
         const desc = decBlob(msg.sdp); if (!desc) return;
-        await peer.pc.setRemoteDescription(desc);
-        const answer = await peer.pc.createAnswer();
-        await peer.pc.setLocalDescription(answer);
-        await gatherIce(peer.pc);
-        self._send(peerId, { t: 'renego-answer', sdp: encBlob(peer.pc.localDescription, self._pub) });
+        if (peer.pc.signalingState !== 'stable') return;
+        try {
+          await peer.pc.setRemoteDescription(desc);
+          const answer = await peer.pc.createAnswer();
+          await peer.pc.setLocalDescription(answer);
+          await gatherIce(peer.pc);
+          self._send(peerId, { t: 'renego-answer', sdp: encBlob(peer.pc.localDescription, self._pub) });
+        } catch {}
       })();
       return;
     }
 
     if (msg.t === 'renego-answer') {
-      self._peers.get(peerId)?.pc.setRemoteDescription(decBlob(msg.sdp)).catch(() => {});
+      const peer = self._peers.get(peerId);
+      if (peer?.pc.signalingState === 'have-local-offer') {
+        peer.pc.setRemoteDescription(decBlob(msg.sdp)).catch(() => {});
+      }
       return;
     }
 
@@ -1053,11 +1066,9 @@ The connection persists while you use other tools. A badge in the top bar shows 
       });
     });
 
-    // Stream resolution picker
-    const RES = { 'Original': null, '720p': [1280,720], '1080p': [1920,1080], '4K': [3840,2160] };
+    // Stream settings picker
     main.querySelector('#p2p-screen-res').addEventListener('click', (e) => {
-      const items = Object.keys(RES).map(label => ({ label, deviceId: label }));
-      self._showDevicePicker(e.currentTarget, items, (id) => { self._streamRes = id; });
+      self._showStreamSettings(e.currentTarget);
     });
 
     // Start visualiser loop
@@ -1067,10 +1078,10 @@ The connection persists while you use other tools. A badge in the top bar shows 
     const screenBtn = main.querySelector('#p2p-screen-btn');
     screenBtn.addEventListener('click', async () => {
       if (self._screen) { self._stopScreen(); return; }
-      const resDims = RES[self._streamRes] || null;
-      const videoConstraints = resDims
-        ? { width: { ideal: resDims[0] }, height: { ideal: resDims[1] }, frameRate: { ideal: 30 } }
-        : true;
+      const scaledH = Math.round(1080 * self._streamRes);
+      const videoConstraints = self._streamRes < 1.0
+        ? { height: { ideal: scaledH }, frameRate: { ideal: self._streamFps } }
+        : { frameRate: { ideal: self._streamFps } };
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints, audio: false });
         self._screen = stream;
@@ -1188,6 +1199,69 @@ The connection persists while you use other tools. A badge in the top bar shows 
       const dot = main?.querySelector('.p2p-dot');
       if (dot) { dot.style.background = '#888'; dot.classList.add('p2p-pulse'); }
     }
+  },
+
+  // -Stream settings picker ------------------------------------------------
+
+  _showStreamSettings(anchor) {
+    const self = this;
+    document.getElementById('p2p-streampick')?.remove();
+    const rect = anchor.getBoundingClientRect();
+    const panel = document.createElement('div');
+    panel.id = 'p2p-streampick';
+    panel.style.cssText = `position:fixed;z-index:9999;bottom:${window.innerHeight - rect.top + 6}px;left:${Math.max(4, rect.right - 210)}px;width:210px;background:var(--surface);border:1px solid var(--divider);border-radius:var(--radius);box-shadow:0 -4px 16px rgba(0,0,0,.2);font-size:12px;padding:10px 12px;box-sizing:border-box`;
+
+    const pct = Math.round(self._streamRes * 100);
+    const px  = Math.round(1080 * self._streamRes);
+
+    panel.innerHTML = `
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px">Stream Quality</div>
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-weight:600">Resolution</span>
+          <span id="p2p-res-lbl" style="color:var(--text-muted)">${pct}% (~${px}p)</span>
+        </div>
+        <input type="range" id="p2p-res-sl" min="25" max="100" step="5" value="${pct}"
+          style="width:100%;accent-color:var(--text);cursor:pointer">
+        <div style="display:flex;justify-content:space-between;color:var(--text-muted);font-size:10px;margin-top:2px"><span>0.25×</span><span>1×</span></div>
+      </div>
+      <div>
+        <div style="font-weight:600;margin-bottom:6px">FPS</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap" id="p2p-fps-btns">
+          ${[5,10,15,24,30,60].map(f => {
+            const active = f === self._streamFps;
+            return `<button data-fps="${f}" style="padding:3px 8px;font-size:11px;border-radius:3px;border:1px solid var(--divider);background:${active ? 'var(--text)' : 'var(--bg)'};color:${active ? 'var(--bg)' : 'var(--text)'};cursor:pointer;transition:background .1s">${f}</button>`;
+          }).join('')}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(panel);
+
+    panel.querySelector('#p2p-res-sl').addEventListener('input', e => {
+      self._streamRes = e.target.value / 100;
+      const p = Math.round(1080 * self._streamRes);
+      panel.querySelector('#p2p-res-lbl').textContent = `${e.target.value}% (~${p}p)`;
+    });
+
+    panel.querySelector('#p2p-fps-btns').addEventListener('click', e => {
+      const btn = e.target.closest('[data-fps]');
+      if (!btn) return;
+      self._streamFps = parseInt(btn.dataset.fps);
+      panel.querySelectorAll('[data-fps]').forEach(b => {
+        const on = parseInt(b.dataset.fps) === self._streamFps;
+        b.style.background = on ? 'var(--text)' : 'var(--bg)';
+        b.style.color = on ? 'var(--bg)' : 'var(--text)';
+      });
+    });
+
+    const close = e => {
+      if (!panel.contains(e.target) && e.target !== anchor) {
+        panel.remove();
+        document.removeEventListener('click', close, true);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', close, true), 0);
   },
 
   // -Device picker ---------------------------------------------------------

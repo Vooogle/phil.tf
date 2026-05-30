@@ -157,17 +157,17 @@ export default {
   guide: `## What is this
 Generate seamless tileable noise textures for game assets, UI backgrounds, and procedural art. All patterns tile with no visible seams at any resolution.
 ## Noise types
-- **Perlin** — Smooth organic shapes. Good for clouds, terrain, and soft gradients.
-- **Value** — Blockier variation. Suits stone, rough surfaces, and lo-fi aesthetics.
-- **Cellular** — Voronoi-style cell pattern. Great for skin, scales, and cracked earth.
-- **Ridged** — Sharp ridged peaks. Good for rock, mountains, and leather grain.
-- **Billow** — Puffy rounded shapes. Soft cloud-like version of Perlin.
-- **Domain Warp** — Distorts any noise type for complex marble or fluid effects.
+- **Perlin** - Smooth organic shapes. Good for clouds, terrain, and soft gradients.
+- **Value** - Blockier variation. Suits stone, rough surfaces, and lo-fi aesthetics.
+- **Cellular** - Voronoi-style cell pattern. Great for skin, scales, and cracked earth.
+- **Ridged** - Sharp ridged peaks. Good for rock, mountains, and leather grain.
+- **Billow** - Puffy rounded shapes. Soft cloud-like version of Perlin.
+- **Domain Warp** - Distorts any noise type for complex marble or fluid effects.
 ## Parameters
-- **Octaves** — More octaves layer finer detail on top of coarser shapes.
-- **Frequency** — Higher frequency means smaller, more repeated features.
-- **Persistence** — Controls how much each successive octave contributes.
-- **Seed** — Change to get a completely different variation of the same settings.
+- **Octaves** - More octaves layer finer detail on top of coarser shapes.
+- **Frequency** - Higher frequency means smaller, more repeated features.
+- **Persistence** - Controls how much each successive octave contributes.
+- **Seed** - Change to get a completely different variation of the same settings.
 ## Exporting
 Download as PNG. The output tiles seamlessly and is safe to repeat in CSS or game engines.`,
 
@@ -201,22 +201,22 @@ Download as PNG. The output tiles seamlessly and is safe to repeat in CSS or gam
         </div>
 
         <div class="field">
-          <label>Scale — <span id="pt-scale-val">4</span></label>
+          <label>Scale - <span id="pt-scale-val">4</span></label>
           <input type="range" id="pt-scale" min="1" max="5" value="3">
         </div>
 
         <div class="field">
-          <label>Octaves — <span id="pt-oct-val">4</span></label>
+          <label>Octaves - <span id="pt-oct-val">4</span></label>
           <input type="range" id="pt-oct" min="1" max="8" value="4">
         </div>
 
         <div class="field">
-          <label>Roughness — <span id="pt-rough-val">0.50</span></label>
+          <label>Roughness - <span id="pt-rough-val">0.50</span></label>
           <input type="range" id="pt-rough" min="5" max="95" step="5" value="50">
         </div>
 
         <div class="field">
-          <label>Brightness — <span id="pt-bright-val">1.00</span></label>
+          <label>Brightness - <span id="pt-bright-val">1.00</span></label>
           <div style="display:flex;align-items:center;gap:10px">
             <input type="range" id="pt-bright" min="10" max="300" step="5" value="100" style="flex:1">
             <button class="btn" id="pt-invert" style="padding:4px 10px;font-size:12px;flex-shrink:0">Invert</button>
@@ -224,7 +224,7 @@ Download as PNG. The output tiles seamlessly and is safe to repeat in CSS or gam
         </div>
 
         <div class="field">
-          <label>Contrast — <span id="pt-contrast-val">1.00</span></label>
+          <label>Contrast - <span id="pt-contrast-val">1.00</span></label>
           <input type="range" id="pt-contrast" min="10" max="300" step="5" value="100">
         </div>
 
@@ -566,7 +566,7 @@ Download as PNG. The output tiles seamlessly and is safe to repeat in CSS or gam
           ctx.drawImage(tmp, tx * w, ty * h);
       const info = document.createElement('div');
       info.className = 'fullscreen-modal-info';
-      info.textContent = `${c.width}×${c.height}px — click to close`;
+      info.textContent = `${c.width}×${c.height}px - click to close`;
       modal.appendChild(c); modal.appendChild(info);
       modal.addEventListener('click', () => modal.remove());
       document.body.appendChild(modal);

@@ -33,6 +33,7 @@ function saveExpandedCategories() {
 
 function navigate(path) {
   history.pushState(null, '', path);
+  closeSidebar();
   route(path);
 }
 
@@ -406,7 +407,36 @@ themeToggle.addEventListener('click', () => {
   applyTheme(!isDark);
 });
 
-//  Init 
+//  Mobile nav
+
+const hamburger = document.getElementById('hamburger');
+const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+const previewToggleBtn = document.getElementById('preview-toggle-btn');
+const panelCloseBtn = document.getElementById('panel-close-btn');
+const sidebar = document.getElementById('sidebar');
+const previewPanel = document.getElementById('preview-panel');
+
+function closeSidebar() {
+  sidebar.classList.remove('open');
+  sidebarBackdrop.classList.remove('visible');
+}
+
+hamburger.addEventListener('click', () => {
+  const isOpen = sidebar.classList.toggle('open');
+  sidebarBackdrop.classList.toggle('visible', isOpen);
+});
+
+sidebarBackdrop.addEventListener('click', closeSidebar);
+
+previewToggleBtn.addEventListener('click', () => {
+  previewPanel.classList.toggle('mobile-open');
+});
+
+panelCloseBtn.addEventListener('click', () => {
+  previewPanel.classList.remove('mobile-open');
+});
+
+//  Init
 
 renderNav();
 route(window.location.pathname);

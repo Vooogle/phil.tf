@@ -36,46 +36,6 @@ function diamondTile(x, y, s) {
   };
 }
 
-const SQ3 = Math.sqrt(3);
-
-// Hex Voronoi lookup - takes pre-fitted spacings so the grid divides imgSize exactly.
-// Returns nearest center cx1/cy1, Voronoi gap (d2-d1), and face normal direction.
-function hexVoronoi(px, py, effCS, effRS, nCols, nRows, imgSize) {
-  let d1 = Infinity, d2 = Infinity;
-  let cx1 = 0, cy1 = 0, fnx = 0, fny = 0;
-
-  const c0 = Math.round(px / effCS);
-  for (let dc = -2; dc <= 2; dc++) {
-    const col    = c0 + dc;
-    const colMod = ((col % nCols) + nCols) % nCols;
-    const yOff   = (colMod & 1) ? effRS * 0.5 : 0;
-    const r0     = Math.round((py - yOff) / effRS);
-
-    for (let dr = -2; dr <= 2; dr++) {
-      const row = r0 + dr;
-      const cx  = colMod * effCS;
-      const cy  = (((row % nRows) + nRows) % nRows) * effRS + yOff;
-
-      // Torus distance so edges of image match up
-      let ddx = px - cx, ddy = py - cy;
-      if (ddx >  imgSize * 0.5) ddx -= imgSize;
-      if (ddx < -imgSize * 0.5) ddx += imgSize;
-      if (ddy >  imgSize * 0.5) ddy -= imgSize;
-      if (ddy < -imgSize * 0.5) ddy += imgSize;
-      const d = Math.hypot(ddx, ddy);
-
-      if (d < d1) {
-        d2 = d1;
-        d1 = d; cx1 = cx; cy1 = cy;
-        const inv = d > 0 ? 1 / d : 0;
-        fnx = ddx * inv; fny = ddy * inv;
-      } else if (d < d2) {
-        d2 = d;
-      }
-    }
-  }
-  return { cx: cx1, cy: cy1, gap: d2 - d1, fnx, fny };
-}
 
 function herringboneTile(x, y, s) {
   const b = 2 * s;
@@ -110,8 +70,8 @@ function chevronTile(x, y, s, ratio) {
 // Variation hash
 // cx, cy are wrapped tile-center coords → tileable variation
 
-function tileHash(cx, cy, seed) {
-  let h = (Math.imul(cx | 0, 1619) + Math.imul(cy | 0, 31337) + (seed | 0)) | 0;
+function tileHash(cx, cy) {
+  let h = (Math.imul(cx | 0, 1619) + Math.imul(cy | 0, 31337)) | 0;
   h = Math.imul(h ^ (h >>> 13), 1540483477) | 0;
   return (h >>> 0) / 4294967295;
 }
@@ -121,7 +81,7 @@ function tileHash(cx, cy, seed) {
 function generateTileImage({
   imgSize, tileType, tileSize, ratio,
   groutPct, variation, bevelStrength, bevelWidth, bevelInvert,
-  lightAngle, invert, seed,
+  lightAngle, invert,
 }) {
   const buf  = new Uint8ClampedArray(imgSize * imgSize * 4);
   const bW   = tileSize * ratio;
@@ -138,18 +98,15 @@ function generateTileImage({
         case 'square':      tile = squareTile(px, py, tileSize); break;
         case 'brick':       tile = brickTile(px, py, bW, tileSize); break;
         case 'diamond':     tile = diamondTile(px, py, tileSize); break;
-        case 'hex':         tile = hexTile(px, py, tileSize); break;
         case 'herringbone': tile = herringboneTile(px, py, tileSize); break;
         case 'chevron':     tile = chevronTile(px, py, tileSize, ratio); break;
         default:            tile = squareTile(px, py, tileSize);
       }
 
-      const { cx, cy, u, v, faceDistPx, faceNx, faceNy } = tile;
+      const { cx, cy, u, v } = tile;
 
       // Grout
-      const isGrout = tileType === 'hex'
-        ? faceDistPx < groutPx
-        : u < gh || u > 1 - gh || v < gh || v > 1 - gh;
+      const isGrout = u < gh || u > 1 - gh || v < gh || v > 1 - gh;
 
       let value;
       if (isGrout) {
@@ -158,22 +115,13 @@ function generateTileImage({
         // Tileable variation: wrap center to image period
         const wcx = Math.round(((cx % imgSize) + imgSize) % imgSize);
         const wcy = Math.round(((cy % imgSize) + imgSize) % imgSize);
-        value = 0.76 + variation * (tileHash(wcx, wcy, seed) - 0.5);
+        value = 0.76 + variation * (tileHash(wcx, wcy) - 0.5);
 
         // Bevel / light simulation
         if (bevelStrength > 0 && bevelPx > 0) {
           let slopeFactor, nx, ny;
 
-          if (tileType === 'hex') {
-            // Distance from nearest grout edge inward
-            const bevelDist = faceDistPx - groutPx;
-            if (bevelDist < bevelPx) {
-              slopeFactor = 1 - bevelDist / bevelPx;
-              nx = faceNx; ny = faceNy;
-            } else {
-              slopeFactor = 0;
-            }
-          } else {
+          {
             const du = Math.min(u, 1 - u);
             const dv = Math.min(v, 1 - v);
             const dMin = Math.min(du, dv);
@@ -252,7 +200,6 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
           <select id="tg-type">
             <option value="brick">Brick</option>
             <option value="square">Square</option>
-            <option value="hex">Hexagon</option>
             <option value="diamond">Diamond</option>
             <option value="herringbone">Herringbone</option>
             <option value="chevron">Chevron</option>
@@ -266,7 +213,7 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
 
         <div class="field">
           <label>Tile size - <span id="tg-tile-val">16</span>px</label>
-          <input type="range" id="tg-tile" min="3" max="128" value="16">
+          <input type="range" id="tg-tile" min="0" max="16" value="4">
         </div>
 
         <div class="field">
@@ -302,14 +249,6 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
             <label class="check-label">
               <input type="checkbox" id="tg-bevel-invert"> Concave
             </label>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Seed</label>
-          <div style="display:flex;gap:6px">
-            <input type="number" id="tg-seed" value="1" style="width:90px">
-            <button class="btn" id="tg-random"><img src="/assets/icons/random.svg" class="icon"></button>
           </div>
         </div>
 
@@ -352,7 +291,6 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
     const bevelWRange  = $('tg-bevel-w'),   bevelWSpan    = $('tg-bevel-w-val');
     const lightPicker  = $('tg-light-picker');
     const bevelInvertChk = $('tg-bevel-invert');
-    const seedInput    = $('tg-seed'),      randBtn       = $('tg-random');
     const invertBtn    = $('tg-invert'),    dlBtn         = $('tg-dl');
     const clearBtn     = $('tg-clear'),     statusEl      = $('tg-status');
     const canvas       = $('tg-canvas'),    tiledChk      = $('tg-tiled');
@@ -430,10 +368,45 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
     });
     onWindow('mouseup', () => { pickerDragging = false; });
 
+    // Tile size divisor snapping
+
+    let tileDivisors = [];
+    let currentTileSize = 16;
+
+    function getDivisors(n) {
+      const divs = [];
+      for (let i = 1; i <= Math.min(n, 256); i++)
+        if (n % i === 0) divs.push(i);
+      return divs;
+    }
+
+    function rebuildTileSlider(keepSize) {
+      const imgSize = Math.max(1, Math.min(4096, parseInt(imgSizeInput.value) || 128));
+      tileDivisors = getDivisors(imgSize);
+      tileRange.min = 0;
+      tileRange.max = tileDivisors.length - 1;
+      tileRange.step = 1;
+      // Find closest divisor to current size
+      const target = keepSize ?? currentTileSize;
+      let best = 0;
+      let bestDiff = Infinity;
+      tileDivisors.forEach((d, i) => {
+        const diff = Math.abs(d - target);
+        if (diff < bestDiff) { bestDiff = diff; best = i; }
+      });
+      tileRange.value = best;
+      currentTileSize = tileDivisors[best];
+    }
+
+    function getTileSize() {
+      return tileDivisors[parseInt(tileRange.value)] ?? currentTileSize;
+    }
+
     // Labels
 
     function syncLabels() {
-      tileSpan.textContent  = tileRange.value;
+      currentTileSize = getTileSize();
+      tileSpan.textContent  = currentTileSize;
       ratioSpan.textContent = (parseInt(ratioRange.value) / 10).toFixed(1);
       groutSpan.textContent = groutRange.value;
       varSpan.textContent   = (parseInt(varRange.value) / 100).toFixed(2);
@@ -469,7 +442,7 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
       const opts = {
         imgSize:      Math.max(1, Math.min(4096, parseInt(imgSizeInput.value) || 128)),
         tileType:     typeSel.value,
-        tileSize:     Math.max(1, parseInt(tileRange.value)),
+        tileSize:     getTileSize(),
         ratio:        parseInt(ratioRange.value) / 10,
         groutPct:     parseInt(groutRange.value),
         variation:    parseInt(varRange.value) / 100,
@@ -478,7 +451,6 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
         bevelInvert:  bevelInvertChk.checked,
         lightAngle,
         invert:       inverted,
-        seed:         parseInt(seedInput.value) | 0,
       };
 
       statusEl.textContent = 'Generating…';
@@ -506,12 +478,11 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           type: typeSel.value, imgSize: imgSizeInput.value,
-          tile: tileRange.value, ratio: ratioRange.value,
+          tile: getTileSize(), ratio: ratioRange.value,
           grout: groutRange.value, variation: varRange.value,
           bevel: bevelRange.value, bevelW: bevelWRange.value,
           bevelInvert: bevelInvertChk.checked,
           lightAngle, invert: inverted, filterMode, tiled: tiledChk.checked,
-          seed: seedInput.value,
         }));
       } catch {}
     }
@@ -522,13 +493,12 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
         if (!s) return;
         if (s.type)    typeSel.value        = s.type;
         if (s.imgSize) imgSizeInput.value   = s.imgSize;
-        if (s.tile)    tileRange.value      = s.tile;
+        rebuildTileSlider(s.tile ? parseInt(s.tile) : undefined);
         if (s.ratio)   ratioRange.value     = s.ratio;
         if (s.grout)   groutRange.value     = s.grout;
         if (s.variation) varRange.value     = s.variation;
         if (s.bevel)   bevelRange.value     = s.bevel;
         if (s.bevelW)  bevelWRange.value    = s.bevelW;
-        if (s.seed)    seedInput.value      = s.seed;
         if (typeof s.lightAngle === 'number') lightAngle = s.lightAngle;
         bevelInvertChk.checked = !!s.bevelInvert;
         inverted = !!s.invert;
@@ -545,7 +515,7 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
       localStorage.removeItem(STORAGE_KEY);
       typeSel.value        = 'brick';
       imgSizeInput.value   = '128';
-      tileRange.value      = '16';
+      rebuildTileSlider(16);
       ratioRange.value     = '20';
       groutRange.value     = '15';
       varRange.value       = '20';
@@ -557,7 +527,6 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
       invertBtn.style.background = ''; invertBtn.style.color = '';
       filterMode           = 'raw';
       tiledChk.checked     = false;
-      seedInput.value      = '1';
       filterRaw.classList.add('pt-filter-active');
       filterSmooth.classList.remove('pt-filter-active');
       syncLabels(); drawLightPicker(); doGenerate();
@@ -598,7 +567,7 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
     [typeSel, tileRange, ratioRange, groutRange, varRange, bevelRange, bevelWRange].forEach(el =>
       el.addEventListener('input', () => { syncLabels(); scheduleLive(); }));
 
-    imgSizeInput.addEventListener('change', scheduleLive);
+    imgSizeInput.addEventListener('change', () => { rebuildTileSlider(); syncLabels(); scheduleLive(); });
     bevelInvertChk.addEventListener('change', scheduleLive);
 
     invertBtn.addEventListener('click', () => {
@@ -619,8 +588,6 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
     filterRaw.addEventListener('click', () => setFilter('raw'));
     filterSmooth.addEventListener('click', () => setFilter('smooth'));
 
-    randBtn.addEventListener('click', () => { seedInput.value = Math.floor(Math.random() * 1e6); doGenerate(); });
-
     dlBtn.addEventListener('click', () => {
       if (!lastImageData) return;
       const tmp = document.createElement('canvas');
@@ -639,6 +606,7 @@ Download as a seamless PNG texture at any size. Drop it directly into CSS, Unity
 
     // Init
 
+    rebuildTileSlider(16);
     loadSettings();
     syncLabels();
     drawLightPicker();

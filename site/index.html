@@ -9,9 +9,23 @@
 </head>
 <body>
   <header id="header">
+    <button class="hamburger" id="hamburger" aria-label="Menu">
+      <svg width="18" height="14" viewBox="0 0 18 14" fill="none" aria-hidden="true">
+        <rect width="18" height="2" rx="1" fill="currentColor"/>
+        <rect y="6" width="18" height="2" rx="1" fill="currentColor"/>
+        <rect y="12" width="18" height="2" rx="1" fill="currentColor"/>
+      </svg>
+    </button>
     <a class="site-name" href="/" id="home-link">phil.tf</a>
     <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">☀</button>
+    <button class="preview-toggle-btn" id="preview-toggle-btn" aria-label="Toggle preview" title="Toggle preview">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="10" y1="1.75" x2="10" y2="14.25" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+    </button>
   </header>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <div id="layout">
     <aside id="sidebar">
       <div class="sidebar-top">
@@ -24,7 +38,10 @@
     </aside>
     <main id="tool-view"></main>
     <aside id="preview-panel">
-      <div class="panel-header">Preview</div>
+      <div class="panel-header">
+        Preview
+        <button class="panel-close-btn" id="panel-close-btn" title="Close preview" aria-label="Close preview">✕</button>
+      </div>
       <div id="preview-content"></div>
     </aside>
   </div>
