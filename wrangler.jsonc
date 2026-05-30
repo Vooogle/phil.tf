@@ -3,9 +3,8 @@
   "compatibility_date": "2026-05-30",
   "assets": {
     "directory": ".",
-    "exclude": [
-      ".git/**",
-      ".wrangler/**"
+    "rules": [
+      { "type": "Exclude", "globs": [".git/**", ".wrangler/**"] }
     ]
   }
 }
