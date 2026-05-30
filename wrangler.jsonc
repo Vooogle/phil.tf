@@ -1,12 +1,8 @@
 {
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "philtf",
+  "compatibility_date": "2026-05-30",
   "assets": {
-    "directory": "./",
-    "exclude": [
-      ".git/**",
-      ".wrangler/**",
-      "wrangler.jsonc",
-      "node_modules/**"
-    ]
+    "directory": "./"
   }
 }
