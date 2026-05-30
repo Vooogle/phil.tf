@@ -1,10 +1,12 @@
 {
   "name": "philtf",
-  "compatibility_date": "2026-05-30",
   "assets": {
-    "directory": ".",
-    "rules": [
-      { "type": "Exclude", "globs": [".git/**", ".wrangler/**"] }
+    "directory": "./",
+    "exclude": [
+      ".git/**",
+      ".wrangler/**",
+      "wrangler.jsonc",
+      "node_modules/**"
     ]
   }
 }
