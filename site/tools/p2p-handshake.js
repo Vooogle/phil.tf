@@ -418,6 +418,12 @@ The connection persists while you use other tools. A badge in the top bar shows 
       if (!parsed || parsed.type !== 'answer' || !parsed.pub) { err.textContent = 'Invalid code.'; return; }
       err.textContent = '';
       btn.disabled = true;
+      btn.textContent = 'Connecting…';
+      pc.addEventListener('iceconnectionstatechange', () => {
+        if (err.isConnected) return;
+        err.textContent = `ICE: ${pc.iceConnectionState}`;
+        if (['connected','completed'].includes(pc.iceConnectionState)) err.isConnected = true;
+      });
       try {
         const peerPub = await importPub(parsed.pub);
         const key = await deriveSharedKey(self._kp.privateKey, peerPub);
@@ -425,7 +431,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
         peer.key = key;
         self._bindDC(peerId, dc);
         await pc.setRemoteDescription({ type: parsed.type, sdp: parsed.sdp });
-      } catch(e) { btn.disabled = false; mainEl.querySelector('#p2p-err').textContent = e.message; }
+      } catch(e) { btn.disabled = false; btn.textContent = 'Connect →'; mainEl.querySelector('#p2p-err').textContent = e.message; }
     });
 
     mainEl.querySelector('#p2p-to-receiver').addEventListener('click', () => {
@@ -490,10 +496,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
 
       pc.addEventListener('datachannel', e => { self._peers.get(peerId).dc = e.channel; self._bindDC(peerId, e.channel); });
       pc.addEventListener('track', e => self._onTrack(peerId, e));
-      pc.addEventListener('connectionstatechange', () => {
-        if (pc.connectionState === 'connected') self._onConnected(peerId);
-        if (['failed','closed'].includes(pc.connectionState)) self._onDropped(peerId);
-      });
+      self._watchConn(peerId, pc);
 
       await pc.setRemoteDescription({ type: parsed.type, sdp: parsed.sdp });
       const answer = await pc.createAnswer();
@@ -524,11 +527,23 @@ The connection persists while you use other tools. A badge in the top bar shows 
     self._peers.set(peerId, { pc, dc, key: null, renegoBusy: false, inFiles: new Map(), screenPending: null, name: '', _aud: null });
 
     pc.addEventListener('track', e => self._onTrack(peerId, e));
-    pc.addEventListener('connectionstatechange', () => {
-      if (pc.connectionState === 'connected') self._onConnected(peerId);
-      if (['failed','closed'].includes(pc.connectionState)) self._onDropped(peerId);
-    });
+    self._watchConn(peerId, pc);
     return { peerId, pc, dc };
+  },
+
+  _watchConn(peerId, pc) {
+    const self = this;
+    let connFired = false, dropFired = false;
+    const onConn = () => { if (connFired) return; connFired = true; self._onConnected(peerId); };
+    const onDrop = () => { if (dropFired) return; dropFired = true; self._onDropped(peerId); };
+    pc.addEventListener('connectionstatechange', () => {
+      if (pc.connectionState === 'connected') onConn();
+      if (['failed','closed'].includes(pc.connectionState)) onDrop();
+    });
+    pc.addEventListener('iceconnectionstatechange', () => {
+      if (['connected','completed'].includes(pc.iceConnectionState)) onConn();
+      if (pc.iceConnectionState === 'failed') onDrop();
+    });
   },
 
   _setupRenego(peerId, pc) {
