@@ -39,8 +39,27 @@ function b64u8(b64) { return Uint8Array.from(atob(b64), c => c.charCodeAt(0)); }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function hms() { const d = new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 function fmt(n) { return n < 1024 ? `${n}B` : n < 1048576 ? `${(n/1024).toFixed(1)}KB` : `${(n/1048576).toFixed(1)}MB`; }
-function encBlob(desc, pub) { return btoa(JSON.stringify({ type: desc.type, sdp: desc.sdp, pub })); }
-function decBlob(s) { try { return JSON.parse(atob(s.trim())); } catch { return null; } }
+async function encBlob(desc, pub) {
+  const bytes = new TextEncoder().encode(JSON.stringify({ type: desc.type, sdp: desc.sdp, pub }));
+  const cs = new CompressionStream('deflate-raw');
+  const w = cs.writable.getWriter(); w.write(bytes); w.close();
+  const buf = await new Response(cs.readable).arrayBuffer();
+  return u8b64(new Uint8Array(buf)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+async function decBlob(s) {
+  s = s.trim();
+  try {
+    const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+    const bytes = b64u8(padded);
+    const ds = new DecompressionStream('deflate-raw');
+    const w = ds.writable.getWriter(); w.write(bytes); w.close();
+    const buf = await new Response(ds.readable).arrayBuffer();
+    return JSON.parse(new TextDecoder().decode(buf));
+  } catch {
+    try { return JSON.parse(atob(s)); } catch { return null; }
+  }
+}
 
 const ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -53,8 +72,10 @@ const CHUNK = 12 * 1024;
 async function gatherIce(pc) {
   if (pc.iceGatheringState === 'complete') return;
   return new Promise(res => {
-    const h = () => { if (pc.iceGatheringState === 'complete') { pc.removeEventListener('icegatheringstatechange', h); res(); } };
+    const done = () => { pc.removeEventListener('icegatheringstatechange', h); res(); };
+    const h = () => { if (pc.iceGatheringState === 'complete') done(); };
     pc.addEventListener('icegatheringstatechange', h);
+    setTimeout(done, 4000);
   });
 }
 
@@ -377,7 +398,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       await gatherIce(pc);
-      const blob = encBlob(pc.localDescription, self._pub);
+      const blob = await encBlob(pc.localDescription, self._pub);
       if (!mainEl.querySelector('#p2p-offer')) return; // navigated away
       mainEl.querySelector('#p2p-offer').value = blob;
       const copyBtn = mainEl.querySelector('#p2p-copy');
@@ -390,11 +411,13 @@ The connection persists while you use other tools. A badge in the top bar shows 
     })();
 
     mainEl.querySelector('#p2p-connect').addEventListener('click', async () => {
+      const btn = mainEl.querySelector('#p2p-connect');
       const s = mainEl.querySelector('#p2p-answer').value.trim();
-      const parsed = decBlob(s);
+      const parsed = await decBlob(s);
       const err = mainEl.querySelector('#p2p-err');
       if (!parsed || parsed.type !== 'answer' || !parsed.pub) { err.textContent = 'Invalid code.'; return; }
       err.textContent = '';
+      btn.disabled = true;
       try {
         const peerPub = await importPub(parsed.pub);
         const key = await deriveSharedKey(self._kp.privateKey, peerPub);
@@ -402,7 +425,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
         peer.key = key;
         self._bindDC(peerId, dc);
         await pc.setRemoteDescription({ type: parsed.type, sdp: parsed.sdp });
-      } catch(e) { mainEl.querySelector('#p2p-err').textContent = e.message; }
+      } catch(e) { btn.disabled = false; mainEl.querySelector('#p2p-err').textContent = e.message; }
     });
 
     mainEl.querySelector('#p2p-to-receiver').addEventListener('click', () => {
@@ -452,7 +475,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
 
     mainEl.querySelector('#p2p-gen').addEventListener('click', async () => {
       const s = mainEl.querySelector('#p2p-offer-in').value.trim();
-      const parsed = decBlob(s);
+      const parsed = await decBlob(s);
       const err = mainEl.querySelector('#p2p-err');
       if (!parsed || parsed.type !== 'offer' || !parsed.pub) { err.textContent = 'Invalid code.'; return; }
       err.textContent = '';
@@ -464,7 +487,6 @@ The connection persists while you use other tools. A badge in the top bar shows 
       const key = await deriveSharedKey(self._kp.privateKey, peerPub);
 
       self._peers.set(peerId, { pc, dc: null, key, renegoBusy: false, inFiles: new Map(), screenPending: null, name: '', _aud: null });
-      self._setupRenego(peerId, pc);
 
       pc.addEventListener('datachannel', e => { self._peers.get(peerId).dc = e.channel; self._bindDC(peerId, e.channel); });
       pc.addEventListener('track', e => self._onTrack(peerId, e));
@@ -478,7 +500,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
       await pc.setLocalDescription(answer);
       await gatherIce(pc);
 
-      const blob = encBlob(pc.localDescription, self._pub);
+      const blob = await encBlob(pc.localDescription, self._pub);
       const sec = mainEl.querySelector('#p2p-answer-sec');
       if (!sec) return;
       sec.style.display = '';
@@ -500,7 +522,6 @@ The connection persists while you use other tools. A badge in the top bar shows 
     const dc = pc.createDataChannel('main', { ordered: true });
 
     self._peers.set(peerId, { pc, dc, key: null, renegoBusy: false, inFiles: new Map(), screenPending: null, name: '', _aud: null });
-    self._setupRenego(peerId, pc);
 
     pc.addEventListener('track', e => self._onTrack(peerId, e));
     pc.addEventListener('connectionstatechange', () => {
@@ -512,10 +533,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
 
   _setupRenego(peerId, pc) {
     const self = this;
-    let ready = false;
-    setTimeout(() => { ready = true; }, 200);
     pc.addEventListener('negotiationneeded', async () => {
-      if (!ready) return;
       const peer = self._peers.get(peerId);
       if (!peer || peer.renegoBusy || pc.signalingState !== 'stable') return;
       peer.renegoBusy = true;
@@ -523,7 +541,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await gatherIce(pc);
-        await self._send(peerId, { t: 'renego-offer', sdp: encBlob(pc.localDescription, self._pub) });
+        await self._send(peerId, { t: 'renego-offer', sdp: await encBlob(pc.localDescription, self._pub) });
       } catch {} finally { peer.renegoBusy = false; }
     });
   },
@@ -532,6 +550,10 @@ The connection persists while you use other tools. A badge in the top bar shows 
 
   _bindDC(peerId, dc) {
     const self = this;
+    dc.addEventListener('open', () => {
+      const peer = self._peers.get(peerId);
+      if (peer?.pc) self._setupRenego(peerId, peer.pc);
+    });
     dc.addEventListener('message', async e => {
       const peer = self._peers.get(peerId);
       if (!peer?.key) return;
@@ -603,24 +625,27 @@ The connection persists while you use other tools. A badge in the top bar shows 
       (async () => {
         const peer = self._peers.get(peerId);
         if (!peer) return;
-        const desc = decBlob(msg.sdp); if (!desc) return;
+        const desc = await decBlob(msg.sdp); if (!desc) return;
         if (peer.pc.signalingState !== 'stable') return;
         try {
           await peer.pc.setRemoteDescription(desc);
           const answer = await peer.pc.createAnswer();
           await peer.pc.setLocalDescription(answer);
           await gatherIce(peer.pc);
-          self._send(peerId, { t: 'renego-answer', sdp: encBlob(peer.pc.localDescription, self._pub) });
+          self._send(peerId, { t: 'renego-answer', sdp: await encBlob(peer.pc.localDescription, self._pub) });
         } catch {}
       })();
       return;
     }
 
     if (msg.t === 'renego-answer') {
-      const peer = self._peers.get(peerId);
-      if (peer?.pc.signalingState === 'have-local-offer') {
-        peer.pc.setRemoteDescription(decBlob(msg.sdp)).catch(() => {});
-      }
+      (async () => {
+        const peer = self._peers.get(peerId);
+        if (peer?.pc.signalingState === 'have-local-offer') {
+          const desc = await decBlob(msg.sdp);
+          if (desc) peer.pc.setRemoteDescription(desc).catch(() => {});
+        }
+      })();
       return;
     }
 
@@ -1119,7 +1144,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       await gatherIce(pc);
-      const blob = encBlob(pc.localDescription, self._pub);
+      const blob = await encBlob(pc.localDescription, self._pub);
 
       prev.querySelector('#p2p-invite-blob').value = blob;
       prev.querySelector('#p2p-invite-copy').addEventListener('click', () => {
@@ -1130,7 +1155,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
 
       prev.querySelector('#p2p-invite-connect').addEventListener('click', async () => {
         const s = prev.querySelector('#p2p-invite-ans').value.trim();
-        const parsed = decBlob(s);
+        const parsed = await decBlob(s);
         const err = prev.querySelector('#p2p-invite-err');
         if (!parsed || parsed.type !== 'answer' || !parsed.pub) { err.textContent = 'Invalid code.'; err.style.display = ''; return; }
         err.style.display = 'none';
