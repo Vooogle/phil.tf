@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>phil.tf</title>
+  <link rel="icon" href="/assets/icon.png" type="image/png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header id="header">
+    <a class="site-name" href="/" id="home-link">phil.tf</a>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">☀</button>
+  </header>
+  <div id="layout">
+    <aside id="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-label">Tools</div>
+        <div class="sidebar-search">
+          <input type="text" id="tool-search" placeholder="Search…" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+      <nav id="tool-nav"></nav>
+    </aside>
+    <main id="tool-view"></main>
+    <aside id="preview-panel">
+      <div class="panel-header">Preview</div>
+      <div id="preview-content"></div>
+    </aside>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
