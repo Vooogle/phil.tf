@@ -154,6 +154,7 @@ export default {
   name: 'TLD List',
   category: 'Web',
   description: 'Check domain availability across TLDs. Filter by length, type, CF, layout.',
+  previewLabel: 'Details',
   guide: `## Free Domain Availability Checker — Search All TLDs at Once
 This is a free bulk domain availability checker that searches across hundreds of TLDs simultaneously. Use it to find available domain names, check .com availability, browse country-code TLDs, and filter by TLD type or Cloudflare registrar support. Results are DNS-based — always confirm with a registrar before purchasing.
 ## How to use

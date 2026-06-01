@@ -154,6 +154,7 @@ export default {
   name: 'Noise Generator',
   category: 'Texturing',
   description: 'Tileable noise map generator. Perlin, Value, Cellular, Ridged, Billow, Domain Warp.',
+  previewLabel: 'Preview',
   guide: `## What is this
 Generate seamless tileable noise textures for game assets, UI backgrounds, and procedural art. All patterns tile with no visible seams at any resolution.
 ## Noise types

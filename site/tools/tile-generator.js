@@ -167,6 +167,7 @@ export default {
   name: 'Tile Generator',
   category: 'Texturing',
   description: 'Math-based tileable patterns - brick, hex, diamond, herringbone, chevron.',
+  previewLabel: 'Preview',
   guide: `## Free Online Seamless Tile Pattern Generator
 This is a free browser-based seamless tile pattern generator. Create tileable brick patterns, hexagon tile textures, diamond grid patterns, herringbone tile designs, and chevron patterns at any resolution. Useful for CSS backgrounds, game textures, architectural visualizations, and print design. No download required.
 ## Pattern types
