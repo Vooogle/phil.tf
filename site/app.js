@@ -15,7 +15,6 @@ const state = {
 const toolNav = document.getElementById('tool-nav');
 const toolView = document.getElementById('tool-view');
 const previewContent = document.getElementById('preview-content');
-const previewPanel = document.getElementById('preview-panel');
 const previewLabel = document.getElementById('preview-label');
 const searchInput = document.getElementById('tool-search');
 const homeLink = document.getElementById('home-link');
