@@ -1,7 +1,6 @@
 import noiseGenerator    from './noise-generator.js';
 import tileGenerator     from './tile-generator.js';
 import tldList           from './tld-list.js';
-import p2pHandshake      from './p2p-handshake.js';
 import imageConverter    from './image-converter.js';
 import audioConverter    from './audio-converter.js';
 import videoConverter    from './video-converter.js';
@@ -14,7 +13,6 @@ export const tools = [
   noiseGenerator,
   tileGenerator,
   tldList,
-  p2pHandshake,
   imageConverter,
   audioConverter,
   videoConverter,
