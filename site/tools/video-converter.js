@@ -1,6 +1,7 @@
 import { esc, fmt, injectCSS, makeDropZone, makeResultRow } from './_ui.js';
 import { loadFFmpeg, ffExec, probeInfo, CRASHY_AUDIO, resetFFmpeg } from './_ffmpeg.js';
 import { isVideo, buildVf, vcodecArgs, buildAudioArgs, videoSettingsHTML, readVideoSettings } from './_video.js';
+import { injectGuide } from './guide.js';
 
 const MIME = {
   mp4:'video/mp4', webm:'video/webm', mkv:'video/x-matroska',
@@ -13,6 +14,28 @@ export default {
   name: 'Video Converter',
   category: 'Video',
   description: 'Convert video between MP4, WebM, MKV, MOV, AVI, and GIF.',
+  guide: `## Video Converter - Free Browser-Based Video Format Conversion
+Convert video files between MP4, WebM, MKV, MOV, AVI, and GIF - no upload, runs in your browser using FFmpeg WebAssembly.
+
+## Supported formats
+- MP4 (H.264/H.265) - most compatible, works everywhere
+- WebM (VP9/AV1) - open format, great for web
+- MKV - flexible container, supports any codec
+- MOV - Apple format, good for editing workflows
+- AVI - legacy format, wide compatibility
+- GIF - animated image, no audio, large file size
+
+## How to use
+- Drop a video file or click to browse
+- Choose output format, codec, quality, and resolution
+- Optionally adjust audio settings
+- Download the converted file
+
+## Notes
+- Files never leave your browser
+- Large files may take a while - conversion is CPU intensive
+- GIF output has no audio and large file sizes - use WebM for better results
+`,
 
   _mainEl: null,
 
@@ -22,6 +45,7 @@ export default {
     makeDropZone(mainEl, 'cv-body', 'video/*',
       'MP4 · WebM · MKV · MOV · AVI · M4V',
       f => isVideo(f) && this._loadFile(f));
+    injectGuide(mainEl, this.guide);
   },
 
   destroy() { this._mainEl = null; },

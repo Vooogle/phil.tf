@@ -1,6 +1,7 @@
 import { esc, fmt, injectCSS, makeDropZone, makeResultRow } from './_ui.js';
 import { loadFFmpeg, ffExec, probeInfo, CRASHY_AUDIO, resetFFmpeg } from './_ffmpeg.js';
 import { isVideo, buildVf, vcodecArgs, buildAudioArgs, videoSettingsHTML, readVideoSettings } from './_video.js';
+import { injectGuide } from './guide.js';
 
 function fmtT(s) {
   if (!isFinite(s) || s < 0) s = 0;
@@ -134,7 +135,28 @@ export default {
   id: 'video-editor',
   name: 'Video Editor',
   category: 'Video',
-  description: 'Timeline-based video editor — cut, trim, and export entirely in your browser.',
+  description: 'Timeline-based video editor - cut, trim, and export entirely in your browser.',
+  guide: `## Video Editor - Free Browser-Based Video Trimmer and Cutter
+Timeline-based video editor - cut, trim, split, and export video clips without installing anything.
+
+## How to use
+- Drop a video file or click to browse
+- Use the timeline to set in and out points
+- Add cuts to split the video into segments
+- Reorder or remove segments as needed
+- Choose export format and quality, then export
+
+## Keyboard shortcuts
+- Space - play / pause
+- Left / Right arrow - step one frame
+- I - set in point at current position
+- O - set out point at current position
+
+## Notes
+- Files never leave your browser - export runs locally using FFmpeg WebAssembly
+- Large files may take time to process
+- For simple trimming a single clip is fastest - adding many segments increases export time
+`,
 
   _mainEl: null,
   _st: null,
@@ -147,6 +169,7 @@ export default {
     injectEdCSS();
     this._expandLayout();
     makeDropZone(mainEl, 'cv-body', 'video/*', 'MP4 · WebM · MKV · MOV · AVI', f => isVideo(f) && this._load(f));
+    injectGuide(mainEl, this.guide);
   },
 
   destroy() {

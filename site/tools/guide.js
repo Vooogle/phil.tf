@@ -29,11 +29,9 @@ function mdToHtml(md) {
 }
 
 export function injectGuide(mainEl, markdown) {
-  const content = mainEl.querySelector('.tool-content');
-  if (!content) return;
-
+  const target = mainEl.querySelector('.tool-content') || mainEl;
   const details = document.createElement('details');
   details.className = 'tool-guide';
   details.innerHTML = `<summary class="tool-guide-toggle">Guide</summary><div class="tool-guide-body">${mdToHtml(markdown)}</div>`;
-  content.appendChild(details);
+  target.appendChild(details);
 }

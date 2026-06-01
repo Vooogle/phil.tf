@@ -1,5 +1,6 @@
 import { esc, fmt, injectCSS, makeDropZone, makeResultRow } from './_ui.js';
 import { loadFFmpeg, ffExec } from './_ffmpeg.js';
+import { injectGuide } from './guide.js';
 
 const MIME = { mp3:'audio/mpeg', wav:'audio/wav', ogg:'audio/ogg', flac:'audio/flac', aac:'audio/aac', opus:'audio/opus' };
 const FORMATS = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'opus'];
@@ -14,6 +15,27 @@ export default {
   name: 'Audio Converter',
   category: 'Media',
   description: 'Convert audio between MP3, WAV, OGG, FLAC, AAC, and Opus.',
+  guide: `## Audio Converter - Free Browser-Based Audio Format Conversion
+Convert audio files between MP3, WAV, OGG, FLAC, AAC, M4A, Opus, and AIFF - runs entirely in your browser with no upload required.
+
+## Supported formats
+- MP3 - universal compatibility, lossy
+- WAV - uncompressed, lossless, large files
+- OGG - open format, good quality at low bitrates
+- FLAC - lossless compression, smaller than WAV
+- AAC - better quality than MP3 at same bitrate
+- Opus - best quality at low bitrates, great for voice
+
+## How to use
+- Drop an audio file or click to browse
+- Choose output format and bitrate
+- Download the converted file
+
+## Notes
+- Files never leave your browser - powered by FFmpeg compiled to WebAssembly
+- First conversion takes a moment to load FFmpeg
+- Lossless to lossy conversion always works - lossy to lossless won't recover lost quality
+`,
 
   _mainEl: null,
 
@@ -23,6 +45,7 @@ export default {
     makeDropZone(mainEl, 'cv-body', 'audio/*',
       'MP3 · WAV · OGG · FLAC · AAC · M4A · Opus · AIFF',
       f => isAudio(f) && this._loadFile(f));
+    injectGuide(mainEl, this.guide);
   },
 
   destroy() { this._mainEl = null; },

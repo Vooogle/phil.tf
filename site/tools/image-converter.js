@@ -1,4 +1,5 @@
 import { esc, fmt, injectCSS, makeDropZone, makeResultRow } from './_ui.js';
+import { injectGuide } from './guide.js';
 
 const MIME = { jpeg:'image/jpeg', png:'image/png', webp:'image/webp' };
 
@@ -38,6 +39,26 @@ export default {
   name: 'Image Converter',
   category: 'Media',
   description: 'Convert images between JPEG, PNG, and WebP with quality and resize controls.',
+  guide: `## Image Converter - Free Browser-Based Image Format Conversion
+Convert images between JPEG, PNG, WebP, GIF, BMP, AVIF, and TIFF - no upload, no server, all in your browser.
+
+## Supported formats
+- JPEG - best for photos, lossy compression
+- PNG - lossless, supports transparency
+- WebP - modern format, smaller files than JPEG/PNG
+- GIF, BMP, AVIF, TIFF also supported as input
+
+## How to use
+- Drop an image file or click to browse
+- Choose output format and quality
+- Optionally resize by width or height
+- Download the converted file
+
+## Notes
+- Files never leave your browser - conversion runs locally
+- Quality slider only applies to JPEG and WebP output
+- Resize preserves aspect ratio when only one dimension is set
+`,
 
   _mainEl: null,
 
@@ -47,6 +68,7 @@ export default {
     makeDropZone(mainEl, 'cv-body', 'image/*',
       'JPEG · PNG · WebP · GIF · BMP · AVIF · TIFF',
       f => isImage(f) && this._loadFile(f));
+    injectGuide(mainEl, this.guide);
   },
 
   destroy() { this._mainEl = null; },

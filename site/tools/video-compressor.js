@@ -1,5 +1,6 @@
 import { esc, fmt, injectCSS, makeDropZone, makeResultRow } from './_ui.js';
 import { loadFFmpeg, ffExec, parseFFmpegProgress, probeInfo, CRASHY_AUDIO, resetFFmpeg } from './_ffmpeg.js';
+import { injectGuide } from './guide.js';
 
 function isVideo(file) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
@@ -11,6 +12,24 @@ export default {
   name: 'Video Compressor',
   category: 'Video',
   description: 'Compress video to a target file size using 2-pass encoding.',
+  guide: `## Video Compressor - Free Browser-Based Video Size Reduction
+Compress video to a target file size using 2-pass FFmpeg encoding - runs entirely in your browser, no upload needed.
+
+## How it works
+2-pass encoding calculates the exact bitrate needed in the first pass, then encodes with that bitrate in the second pass. Much more accurate than single-pass compression.
+
+## How to use
+- Drop a video file or click to browse
+- Set your target file size in MB
+- Hit compress and wait for both passes to complete
+- Download the compressed file
+
+## Notes
+- Files never leave your browser
+- 2-pass encoding takes roughly 2x longer than single-pass
+- Very aggressive targets (e.g. 10MB for a 1-hour video) will result in low quality - there are physical limits to compression
+- Audio is also compressed to fit the target size
+`,
 
   _mainEl: null,
 
@@ -20,6 +39,7 @@ export default {
     makeDropZone(mainEl, 'cv-body', 'video/*',
       'MP4 · WebM · MKV · MOV · AVI',
       f => isVideo(f) && this._loadFile(f));
+    injectGuide(mainEl, this.guide);
   },
 
   destroy() { this._mainEl = null; },
