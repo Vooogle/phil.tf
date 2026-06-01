@@ -61,12 +61,13 @@ async function decBlob(s) {
   }
 }
 
-const ICE = { iceServers: [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun.cloudflare.com:3478' },
-  { urls: 'stun:stun.services.mozilla.com' },
-] };
+const STUN_DEFAULTS = [
+  'stun.l.google.com:19302',
+  'stun1.l.google.com:19302',
+  'stun.cloudflare.com:3478',
+  'stun.services.mozilla.com',
+];
+const STUN_LIST_URL = 'https://gist.githubusercontent.com/mondain/b0ec1cf5f60ae726202e/raw/2d2b96b4508a38d342e0228d46eab84dad2398a3/public-stun-list.txt';
 const CHUNK = 12 * 1024;
 
 async function gatherIce(pc) {
@@ -95,6 +96,7 @@ export default {
   name: 'P2P Connect',
   category: 'Network',
   description: 'Serverless P2P via copy-paste WebRTC handshake. E2EE. Voice, screen share, file transfer.',
+  previewLabel: 'Peers',
   guide: `## P2P Connect - No Server Required
 Connect directly by exchanging short codes. No account, no server, no install.
 
@@ -137,6 +139,9 @@ The connection persists while you use other tools. A badge in the top bar shows 
   _myAnalyser: null,
   _streamRes: 1.0,
   _streamFps: 30,
+  _history: [],
+  _stunSel: null,
+  _stunFetched: null,
   _mainEl: null,
   _previewEl: null,
   _cleanups: [],
@@ -148,30 +153,38 @@ The connection persists while you use other tools. A badge in the top bar shows 
     this._injectCSS();
 
     if (_live) {
-      this._kp         = _live.kp;
-      this._pub        = _live.pub;
-      this._peers      = _live.peers;
-      this._mic        = _live.mic;
-      this._screen     = _live.screen;
-      this._micMuted   = _live.micMuted;
-      this._audMuted   = _live.audMuted;
-      this._myName     = _live.myName;
-      this._analysers  = _live.analysers;
-      this._myAnalyser = _live.myAnalyser;
-      this._streamRes  = _live.streamRes;
-      this._streamFps  = _live.streamFps;
-      _live = null;
-      this._mountConnected();
-      injectGuide(mainEl, this.guide);
-      return;
+      const stillAlive = [..._live.peers.values()].some(p => p.pc?.connectionState === 'connected' && p.dc?.readyState === 'open');
+      if (!stillAlive) {
+        for (const p of _live.peers.values()) { try { p.dc?.close(); } catch {} try { p.pc?.close(); } catch {} }
+        _live = null;
+      } else {
+        this._kp         = _live.kp;
+        this._pub        = _live.pub;
+        this._peers      = _live.peers;
+        this._mic        = _live.mic;
+        this._screen     = _live.screen;
+        this._micMuted   = _live.micMuted;
+        this._audMuted   = _live.audMuted;
+        this._myName     = _live.myName;
+        this._analysers  = _live.analysers;
+        this._myAnalyser = _live.myAnalyser;
+        this._streamRes  = _live.streamRes;
+        this._streamFps  = _live.streamFps;
+        this._history    = _live.history || [];
+        _live = null;
+        this._mountConnected(true);
+        injectGuide(mainEl, this.guide);
+        return;
+      }
     }
 
     this._peers      = new Map();
+    this._history    = [];
     this._mic        = null;
     this._screen     = null;
     this._micMuted   = false;
     this._audMuted   = false;
-    this._myName     = '';
+    this._myName     = localStorage.getItem('p2p-name') || '';
     this._analysers  = new Map();
     this._myAnalyser = null;
 
@@ -187,7 +200,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
   destroy() {
     const isLive = this._peers && [...this._peers.values()].some(p => p.pc?.connectionState === 'connected');
     if (isLive) {
-      _live = { kp: this._kp, pub: this._pub, peers: this._peers, mic: this._mic, screen: this._screen, micMuted: this._micMuted, audMuted: this._audMuted, myName: this._myName, analysers: this._analysers, myAnalyser: this._myAnalyser, streamRes: this._streamRes, streamFps: this._streamFps };
+      _live = { kp: this._kp, pub: this._pub, peers: this._peers, mic: this._mic, screen: this._screen, micMuted: this._micMuted, audMuted: this._audMuted, myName: this._myName, analysers: this._analysers, myAnalyser: this._myAnalyser, streamRes: this._streamRes, streamFps: this._streamFps, history: this._history };
       this._cleanups.forEach(fn => fn()); this._cleanups = [];
       this._mainEl = null; this._previewEl = null;
       // Badge stays - connection is live
@@ -196,6 +209,114 @@ The connection persists while you use other tools. A badge in the top bar shows 
       this._teardown();
       this._removeHeaderBadge();
     }
+  },
+
+  // -STUN picker -----------------------------------------------------------
+
+  _stunLoad() {
+    if (this._stunSel) return;
+    try {
+      const s = localStorage.getItem('p2p-stun');
+      this._stunSel = s ? new Set(JSON.parse(s)) : new Set(STUN_DEFAULTS);
+    } catch { this._stunSel = new Set(STUN_DEFAULTS); }
+  },
+
+  _stunSave() {
+    localStorage.setItem('p2p-stun', JSON.stringify([...this._stunSel]));
+  },
+
+  _makeICE() {
+    this._stunLoad();
+    const sel = this._stunSel.size ? [...this._stunSel] : STUN_DEFAULTS;
+    return { iceServers: sel.map(u => ({ urls: 'stun:' + u })) };
+  },
+
+  _mountStunPicker(container) {
+    const self = this;
+    self._stunLoad();
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'border-top:1px solid var(--divider);padding-top:10px;margin-top:10px';
+    wrap.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" id="p2p-stun-hdr">
+        <span style="font-size:11px;color:var(--text-muted);transition:transform .15s" id="p2p-stun-chev">▶</span>
+        <span class="p2p-lbl" style="margin:0">STUN servers</span>
+        <span id="p2p-stun-cnt" class="p2p-hint" style="margin-left:auto">${self._stunSel.size} selected</span>
+      </div>
+      <div id="p2p-stun-body" style="display:none;margin-top:8px">
+        <button class="btn" id="p2p-stun-fetch" style="font-size:11px;padding:4px 10px;margin-bottom:8px;width:100%">Load public list (${STUN_DEFAULTS.length + (self._stunFetched?.length || 0)} known)</button>
+        <div id="p2p-stun-list" style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;margin-bottom:8px"></div>
+        <div style="display:flex;gap:6px">
+          <input id="p2p-stun-custom" type="text" placeholder="hostname:port" autocomplete="off"
+            style="flex:1;padding:5px 8px;background:var(--bg);border:1px solid var(--input-border);border-radius:var(--radius);color:var(--text);font-size:12px;font-family:inherit;outline:none">
+          <button class="btn" id="p2p-stun-add" style="font-size:12px;padding:5px 10px">Add</button>
+        </div>
+        <div id="p2p-stun-err" class="p2p-hint" style="color:#e44;margin-top:4px;display:none"></div>
+      </div>
+    `;
+    container.appendChild(wrap);
+
+    const hdr    = wrap.querySelector('#p2p-stun-hdr');
+    const body   = wrap.querySelector('#p2p-stun-body');
+    const chev   = wrap.querySelector('#p2p-stun-chev');
+    const cnt    = wrap.querySelector('#p2p-stun-cnt');
+    const list   = wrap.querySelector('#p2p-stun-list');
+    const fetchBtn = wrap.querySelector('#p2p-stun-fetch');
+    const custIn = wrap.querySelector('#p2p-stun-custom');
+    const addBtn = wrap.querySelector('#p2p-stun-add');
+    const errEl  = wrap.querySelector('#p2p-stun-err');
+
+    const updateCnt = () => { cnt.textContent = `${self._stunSel.size} selected`; };
+
+    const renderList = () => {
+      list.innerHTML = '';
+      const all = [...new Set([...STUN_DEFAULTS, ...(self._stunFetched || []), ...self._stunSel])];
+      all.forEach(url => {
+        const row = document.createElement('label');
+        row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 4px;font-size:11px;cursor:pointer;border-radius:3px';
+        row.innerHTML = `<input type="checkbox" ${self._stunSel.has(url) ? 'checked' : ''} style="flex-shrink:0"><span style="flex:1;font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(url)}</span>`;
+        row.querySelector('input').addEventListener('change', e => {
+          if (e.target.checked) self._stunSel.add(url); else self._stunSel.delete(url);
+          self._stunSave(); updateCnt();
+        });
+        list.appendChild(row);
+      });
+    };
+
+    hdr.addEventListener('click', () => {
+      const open = body.style.display === 'none';
+      body.style.display = open ? '' : 'none';
+      chev.textContent = open ? '▼' : '▶';
+      if (open && !list.children.length) renderList();
+    });
+
+    fetchBtn.addEventListener('click', async () => {
+      fetchBtn.disabled = true; fetchBtn.textContent = 'Loading…';
+      errEl.style.display = 'none';
+      try {
+        const text = await fetch(STUN_LIST_URL).then(r => r.text());
+        self._stunFetched = text.split('\n')
+          .map(l => l.trim())
+          .filter(l => l && !l.startsWith('#') && /^[\w.-]+:\d+$/.test(l));
+        fetchBtn.textContent = `Loaded ${self._stunFetched.length} servers`;
+        renderList();
+      } catch(e) {
+        fetchBtn.disabled = false; fetchBtn.textContent = 'Retry load';
+        errEl.textContent = 'Fetch failed: ' + e.message; errEl.style.display = '';
+      }
+    });
+
+    const addCustom = () => {
+      const url = custIn.value.trim();
+      if (!url) return;
+      if (!/^[\w.-]+:\d+$/.test(url)) { errEl.textContent = 'Format: hostname:port'; errEl.style.display = ''; return; }
+      errEl.style.display = 'none';
+      self._stunSel.add(url);
+      self._stunSave(); updateCnt(); renderList();
+      custIn.value = '';
+    };
+    addBtn.addEventListener('click', addCustom);
+    custIn.addEventListener('keydown', e => { if (e.key === 'Enter') addCustom(); });
   },
 
   // -CSS ------------------------------------------------------------------
@@ -392,6 +513,8 @@ The connection persists while you use other tools. A badge in the top bar shows 
       </div>
     `;
 
+    self._mountStunPicker(mainEl.querySelector('.p2p-card'));
+
     const { peerId, pc, dc } = self._makePeerConnection();
 
     (async () => {
@@ -489,40 +612,52 @@ The connection persists while you use other tools. A badge in the top bar shows 
 
     mainEl.querySelector('#p2p-to-caller').addEventListener('click', () => self._mountCaller());
 
+    self._mountStunPicker(mainEl.querySelector('.p2p-card'));
+
     mainEl.querySelector('#p2p-gen').addEventListener('click', async () => {
       const s = mainEl.querySelector('#p2p-offer-in').value.trim();
       const parsed = await decBlob(s);
       const err = mainEl.querySelector('#p2p-err');
       if (!parsed || parsed.type !== 'offer' || !parsed.pub) { err.textContent = 'Invalid code.'; return; }
       err.textContent = '';
-      mainEl.querySelector('#p2p-gen').disabled = true;
+      const genBtn = mainEl.querySelector('#p2p-gen');
+      genBtn.disabled = true;
+      genBtn.textContent = 'Generating…';
 
-      const peerId = Math.random().toString(36).slice(2, 10);
-      const pc = new RTCPeerConnection(ICE);
-      const peerPub = await importPub(parsed.pub);
-      const key = await deriveSharedKey(self._kp.privateKey, peerPub);
+      try {
+        const peerId = Math.random().toString(36).slice(2, 10);
+        const pc = new RTCPeerConnection(self._makeICE());
+        const peerPub = await importPub(parsed.pub);
+        const key = await deriveSharedKey(self._kp.privateKey, peerPub);
 
-      self._peers.set(peerId, { pc, dc: null, key, renegoBusy: false, inFiles: new Map(), screenPending: null, name: '', _aud: null });
+        self._peers.set(peerId, { pc, dc: null, key, renegoBusy: false, inFiles: new Map(), screenPending: null, name: '', _aud: null });
 
-      pc.addEventListener('datachannel', e => { self._peers.get(peerId).dc = e.channel; self._bindDC(peerId, e.channel); });
-      pc.addEventListener('track', e => self._onTrack(peerId, e));
-      self._watchConn(peerId, pc);
+        pc.addEventListener('datachannel', e => { self._peers.get(peerId).dc = e.channel; self._bindDC(peerId, e.channel); });
+        pc.addEventListener('track', e => self._onTrack(peerId, e));
+        self._watchConn(peerId, pc);
 
-      await pc.setRemoteDescription({ type: parsed.type, sdp: parsed.sdp });
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      await gatherIce(pc);
+        await pc.setRemoteDescription({ type: parsed.type, sdp: parsed.sdp });
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await gatherIce(pc);
 
-      const blob = await encBlob(pc.localDescription, self._pub);
-      const sec = mainEl.querySelector('#p2p-answer-sec');
-      if (!sec) return;
-      sec.style.display = '';
-      mainEl.querySelector('#p2p-answer-out').value = blob;
-      mainEl.querySelector('#p2p-copy-ans').addEventListener('click', () => {
-        navigator.clipboard.writeText(blob);
-        const ok = mainEl.querySelector('#p2p-copy-ok');
-        ok.textContent = 'Copied!'; setTimeout(() => { ok.textContent = ''; }, 2000);
-      });
+        const blob = await encBlob(pc.localDescription, self._pub);
+        const sec = mainEl.querySelector('#p2p-answer-sec');
+        if (!sec) return;
+        sec.style.display = '';
+        mainEl.querySelector('#p2p-answer-out').value = blob;
+        genBtn.textContent = 'Done ✓';
+        mainEl.querySelector('#p2p-copy-ans').addEventListener('click', () => {
+          navigator.clipboard.writeText(blob);
+          const ok = mainEl.querySelector('#p2p-copy-ok');
+          ok.textContent = 'Copied!'; setTimeout(() => { ok.textContent = ''; }, 2000);
+        });
+      } catch(e) {
+        console.error('[p2p] generate response failed:', e);
+        err.textContent = e.message;
+        genBtn.disabled = false;
+        genBtn.textContent = 'Generate response →';
+      }
     });
   },
 
@@ -531,7 +666,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
   _makePeerConnection() {
     const self = this;
     const peerId = Math.random().toString(36).slice(2, 10);
-    const pc = new RTCPeerConnection(ICE);
+    const pc = new RTCPeerConnection(self._makeICE());
     const dc = pc.createDataChannel('main', { ordered: true });
 
     self._peers.set(peerId, { pc, dc, key: null, renegoBusy: false, inFiles: new Map(), screenPending: null, name: '', _aud: null });
@@ -553,7 +688,6 @@ The connection persists while you use other tools. A badge in the top bar shows 
     });
     pc.addEventListener('iceconnectionstatechange', () => {
       console.log('[p2p] watchConn iceConnectionState:', pc.iceConnectionState);
-      if (['connected','completed'].includes(pc.iceConnectionState)) onConn();
       if (pc.iceConnectionState === 'failed') onDrop();
     });
   },
@@ -613,6 +747,22 @@ The connection persists while you use other tools. A badge in the top bar shows 
       if (peer) peer.name = msg.name;
       self._appendMsg('p2p-sys', `${esc(msg.name)} joined`);
       self._refreshPeerList();
+      if (self._history.length) self._send(peerId, { t: 'history', items: self._history });
+      return;
+    }
+
+    if (msg.t === 'history') {
+      if (!msg.items?.length) return;
+      const box = self._mainEl?.querySelector('#p2p-msgs');
+      if (!box) return;
+      const frag = document.createDocumentFragment();
+      msg.items.forEach(({ cls, html }) => {
+        const el = document.createElement('div');
+        el.className = cls; el.innerHTML = html;
+        frag.appendChild(el);
+      });
+      box.insertBefore(frag, box.firstChild);
+      box.scrollTop = box.scrollHeight;
       return;
     }
 
@@ -712,7 +862,8 @@ The connection persists while you use other tools. A badge in the top bar shows 
     }
   },
 
-  _appendMsg(cls, html) {
+  _appendMsg(cls, html, noHistory = false) {
+    if (!noHistory) this._history.push({ cls, html });
     const box = this._mainEl?.querySelector('#p2p-msgs');
     if (!box) return;
     const el = document.createElement('div');
@@ -770,13 +921,19 @@ The connection persists while you use other tools. A badge in the top bar shows 
 
     if (!self._myName) {
       const dlg = main?.querySelector('#p2p-name-dlg');
-      if (dlg) { dlg.style.display = ''; main.querySelector('#p2p-name-in')?.focus(); }
+      const nameIn = main?.querySelector('#p2p-name-in');
+      const saved = localStorage.getItem('p2p-name');
+      if (dlg) {
+        if (saved && nameIn) nameIn.value = saved;
+        dlg.style.display = '';
+        nameIn?.focus();
+      }
     } else {
       self._send(peerId, { t: 'name', name: self._myName });
     }
   },
 
-  _mountConnected() {
+  _mountConnected(restored = false) {
     const self = this;
     const main = self._mainEl;
     const prev = self._previewEl;
@@ -784,6 +941,11 @@ The connection persists while you use other tools. A badge in the top bar shows 
 
     main.innerHTML = `
       <div class="p2p-connected">
+
+        ${restored ? `<div id="p2p-restore-banner" style="background:color-mix(in srgb,var(--surface) 80%,#f90 20%);border-bottom:1px solid var(--divider);padding:6px 12px;font-size:12px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+          <span style="flex:1">Session restored from background — peer may have left.</span>
+          <button class="btn" id="p2p-banner-leave" style="font-size:11px;padding:3px 9px">Leave &amp; start fresh</button>
+        </div>` : ''}
 
         <div id="p2p-name-dlg" class="p2p-namedlg" style="display:none;flex-shrink:0">
           <div style="font-size:13px;font-weight:600;margin-bottom:8px">What's your name?</div>
@@ -942,6 +1104,19 @@ The connection persists while you use other tools. A badge in the top bar shows 
     const prev = self._previewEl;
     if (!main) return;
 
+    // Replay history
+    if (self._history.length) {
+      const box = main.querySelector('#p2p-msgs');
+      if (box) {
+        self._history.forEach(({ cls, html }) => {
+          const el = document.createElement('div');
+          el.className = cls; el.innerHTML = html;
+          box.appendChild(el);
+        });
+        box.scrollTop = box.scrollHeight;
+      }
+    }
+
     // Name dialog
     const nameDlg = main.querySelector('#p2p-name-dlg');
     const nameIn  = main.querySelector('#p2p-name-in');
@@ -950,6 +1125,7 @@ The connection persists while you use other tools. A badge in the top bar shows 
       const name = raw.trim().slice(0, 32);
       if (!name) { nameDlg.style.display = 'none'; return; }
       self._myName = name;
+      localStorage.setItem('p2p-name', name);
       if (myLbl) myLbl.textContent = name;
       nameDlg.style.display = 'none';
       self._broadcast({ t: 'name', name });
@@ -959,14 +1135,16 @@ The connection persists while you use other tools. A badge in the top bar shows 
     nameIn?.addEventListener('keydown', e => { if (e.key === 'Enter') applyName(nameIn.value); });
 
     // Disconnect / Leave
-    main.querySelector('#p2p-disc').addEventListener('click', () => {
+    const doLeave = () => {
       self._teardown(); self._peers = new Map(); self._myName = ''; self._screen = null; self._mic = null;
       self._removeHeaderBadge();
       genKeyPair().then(async kp => {
         self._kp = kp; self._pub = await exportPub(kp.publicKey);
         self._mountCaller(); injectGuide(main, self.guide);
       });
-    });
+    };
+    main.querySelector('#p2p-disc').addEventListener('click', doLeave);
+    main.querySelector('#p2p-banner-leave')?.addEventListener('click', doLeave);
 
     // Chat
     const cin  = main.querySelector('#p2p-cin');
@@ -975,9 +1153,10 @@ The connection persists while you use other tools. A badge in the top bar shows 
       const text = cin.value.trim(); if (!text) return;
       const ts = hms(); const name = self._myName || 'You';
       await self._broadcast({ t: 'chat', text, ts, name: self._myName });
+      const html = `<b class="p2p-who">${esc(name)}</b>${esc(text)}<span class="p2p-mts">${ts}</span>`;
+      self._history.push({ cls: 'p2p-msg p2p-mine', html });
       const el = document.createElement('div');
-      el.className = 'p2p-msg p2p-mine';
-      el.innerHTML = `<b class="p2p-who">${esc(name)}</b>${esc(text)}<span class="p2p-mts">${ts}</span>`;
+      el.className = 'p2p-msg p2p-mine'; el.innerHTML = html;
       msgs.appendChild(el); msgs.scrollTop = msgs.scrollHeight;
       cin.value = '';
     };

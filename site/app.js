@@ -15,6 +15,8 @@ const state = {
 const toolNav = document.getElementById('tool-nav');
 const toolView = document.getElementById('tool-view');
 const previewContent = document.getElementById('preview-content');
+const previewPanel = document.getElementById('preview-panel');
+const previewLabel = document.getElementById('preview-label');
 const searchInput = document.getElementById('tool-search');
 const homeLink = document.getElementById('home-link');
 const themeToggle = document.getElementById('theme-toggle');
@@ -59,12 +61,17 @@ function loadTool(id) {
   previewContent.innerHTML = '';
   document.title = `${tool.name} — phil.tf`;
 
-  tool.render(toolView, previewContent);
+  const hasPreview = !!tool.previewLabel;
+  previewPanel.style.display = hasPreview ? '' : 'none';
+  previewLabel.textContent = tool.previewLabel || 'Preview';
+
+  tool.render(toolView, hasPreview ? previewContent : null);
 }
 
 function loadLanding() {
   teardown();
   document.title = 'phil.tf';
+  previewPanel.style.display = 'none';
   toolView.innerHTML = '';
   previewContent.innerHTML = '';
   renderLanding();
