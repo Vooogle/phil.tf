@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://phil.tf/</loc><priority>1.0</priority></url>
+  <url><loc>https://phil.tf/about</loc><priority>0.5</priority></url>
+  <url><loc>https://phil.tf/contact</loc><priority>0.5</priority></url>
+  <url><loc>https://phil.tf/tool/noise-generator</loc><priority>0.8</priority></url>
+  <url><loc>https://phil.tf/tool/tile-generator</loc><priority>0.8</priority></url>
+  <url><loc>https://phil.tf/tool/tld-list</loc><priority>0.8</priority></url>
+  <url><loc>https://phil.tf/tool/image-converter</loc><priority>0.8</priority></url>
+  <url><loc>https://phil.tf/tool/audio-converter</loc><priority>0.8</priority></url>
+  <url><loc>https://phil.tf/tool/video-converter</loc><priority>0.8</priority></url>
+  <url><loc>https://phil.tf/tool/video-editor</loc><priority>0.8</priority></url>
+  <url><loc>https://phil.tf/tool/video-compressor</loc><priority>0.8</priority></url>
+</urlset>

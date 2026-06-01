@@ -220,6 +220,25 @@ html.light {
   padding: 4px 0 16px;
 }
 
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--divider);
+  display: flex;
+  gap: 12px;
+}
+
+.sidebar-footer-link {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color .15s;
+}
+
+.sidebar-footer-link:hover {
+  color: var(--text);
+}
+
 /* - Favorites section - */
 
 .fav-section {

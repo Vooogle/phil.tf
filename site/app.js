@@ -42,6 +42,10 @@ function route(path) {
   const match = path.match(/^\/tool\/([^/?#]+)/);
   if (match) {
     loadTool(match[1]);
+  } else if (path === '/about') {
+    loadAbout();
+  } else if (path === '/contact') {
+    loadContact();
   } else {
     loadLanding();
   }
@@ -58,7 +62,7 @@ function loadTool(id) {
 
   toolView.innerHTML = '';
   previewContent.innerHTML = '';
-  document.title = `${tool.name} — phil.tf`;
+  setMeta(`${tool.name} — phil.tf`, tool.description || `${tool.name} — free browser tool.`, `https://phil.tf/tool/${tool.id}`);
 
   const hasPreview = !!tool.previewLabel;
   previewPanel.style.display = hasPreview ? '' : 'none';
@@ -67,13 +71,50 @@ function loadTool(id) {
   tool.render(toolView, hasPreview ? previewContent : null);
 }
 
+function setMeta(title, desc, canonical) {
+  document.title = title;
+  document.getElementById('meta-desc').content = desc;
+  document.getElementById('link-canonical').href = canonical;
+}
+
 function loadLanding() {
   teardown();
-  document.title = 'phil.tf';
+  setMeta('phil.tf', 'Free browser-based tools — image, audio, video, noise generation, domain search, and more.', 'https://phil.tf/');
   previewPanel.style.display = 'none';
   toolView.innerHTML = '';
   previewContent.innerHTML = '';
   renderLanding();
+}
+
+function loadAbout() {
+  teardown();
+  setMeta('About — phil.tf', 'About phil.tf — tools made by Phil.', 'https://phil.tf/about');
+  previewPanel.style.display = 'none';
+  previewContent.innerHTML = '';
+  toolView.innerHTML = `
+    <div style="max-width:540px;padding:40px 24px;margin:0 auto">
+      <h1 style="font-size:20px;font-weight:700;margin:0 0 16px">About</h1>
+      <p style="font-size:14px;line-height:1.7;color:var(--text);margin:0">
+        Tools made by me, phil, a bunch of tools i wanted but couldnt find and other fun stuff
+      </p>
+    </div>
+  `;
+}
+
+function loadContact() {
+  teardown();
+  setMeta('Contact — phil.tf', 'Contact Phil — email and Discord.', 'https://phil.tf/contact');
+  previewPanel.style.display = 'none';
+  previewContent.innerHTML = '';
+  toolView.innerHTML = `
+    <div style="max-width:540px;padding:40px 24px;margin:0 auto">
+      <h1 style="font-size:20px;font-weight:700;margin:0 0 16px">Contact</h1>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:14px">
+        <div>Email: <a href="mailto:phil@seeks.men" style="color:var(--text);text-decoration:underline">phil@seeks.men</a></div>
+        <div>Discord: <span style="font-family:ui-monospace,monospace">@voogle</span></div>
+      </div>
+    </div>
+  `;
 }
 
 function teardown() {
@@ -433,6 +474,9 @@ hamburger.addEventListener('click', () => {
 });
 
 sidebarBackdrop.addEventListener('click', closeSidebar);
+
+document.getElementById('nav-about').addEventListener('click', e => { e.preventDefault(); navigate('/about'); });
+document.getElementById('nav-contact').addEventListener('click', e => { e.preventDefault(); navigate('/contact'); });
 
 previewToggleBtn.addEventListener('click', () => {
   previewPanel.classList.toggle('mobile-open');
