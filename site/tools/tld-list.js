@@ -152,6 +152,7 @@ async function runPool(tasks, n) {
 export default {
   id: 'tld-list',
   name: 'TLD List',
+  seoTitle: 'Free Domain Availability Checker - Search All TLDs | phil.tf',
   category: 'Web',
   description: 'Check domain availability across TLDs. Filter by length, type, CF, layout.',
   previewLabel: 'Details',

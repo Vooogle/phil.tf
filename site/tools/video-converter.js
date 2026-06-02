@@ -12,6 +12,7 @@ const FORMATS = ['mp4', 'webm', 'mkv', 'mov', 'avi', 'gif'];
 export default {
   id: 'video-converter',
   name: 'Video Converter',
+  seoTitle: 'Free Video Converter Online - MP4 WebM MKV MOV AVI GIF | phil.tf',
   category: 'Video',
   description: 'Convert video between MP4, WebM, MKV, MOV, AVI, and GIF.',
   guide: `## Video Converter - Free Browser-Based Video Format Conversion

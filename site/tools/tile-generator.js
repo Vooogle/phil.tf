@@ -165,6 +165,7 @@ const STORAGE_KEY  = 'ptk-tile-generator';
 export default {
   id: 'tile-generator',
   name: 'Tile Generator',
+  seoTitle: 'Free Seamless Tile Pattern Generator - Brick Hex Diamond | phil.tf',
   category: 'Texturing',
   description: 'Math-based tileable patterns - brick, hex, diamond, herringbone, chevron.',
   previewLabel: 'Preview',

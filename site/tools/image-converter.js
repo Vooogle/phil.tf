@@ -37,6 +37,7 @@ async function convertImage(file, toExt, settings = {}) {
 export default {
   id: 'image-converter',
   name: 'Image Converter',
+  seoTitle: 'Free Image Converter Online - JPEG PNG WebP | phil.tf',
   category: 'Media',
   description: 'Convert images between JPEG, PNG, and WebP with quality and resize controls.',
   guide: `## Image Converter - Free Browser-Based Image Format Conversion

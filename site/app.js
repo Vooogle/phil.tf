@@ -62,7 +62,7 @@ function loadTool(id) {
 
   toolView.innerHTML = '';
   previewContent.innerHTML = '';
-  setMeta(`${tool.name} — phil.tf`, tool.description || `${tool.name} — free browser tool.`, `https://phil.tf/tool/${tool.id}`);
+  setMeta(tool.seoTitle || `${tool.name} — phil.tf`, tool.description || `${tool.name} — free browser tool.`, `https://phil.tf/tool/${tool.id}`);
 
   const hasPreview = !!tool.previewLabel;
   previewPanel.style.display = hasPreview ? '' : 'none';

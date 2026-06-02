@@ -10,6 +10,7 @@ function isVideo(file) {
 export default {
   id: 'video-compressor',
   name: 'Video Compressor',
+  seoTitle: 'Free Video Compressor - Reduce Video File Size Online | phil.tf',
   category: 'Video',
   description: 'Compress video to a target file size using 2-pass encoding.',
   guide: `## Video Compressor - Free Browser-Based Video Size Reduction

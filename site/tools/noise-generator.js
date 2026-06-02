@@ -152,6 +152,7 @@ const SWATCH_H     = 48;
 export default {
   id: 'noise-generator',
   name: 'Noise Generator',
+  seoTitle: 'Free Tileable Noise Generator - Perlin Value Cellular | phil.tf',
   category: 'Texturing',
   description: 'Tileable noise map generator. Perlin, Value, Cellular, Ridged, Billow, Domain Warp.',
   previewLabel: 'Preview',

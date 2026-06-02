@@ -134,6 +134,7 @@ function injectEdCSS() {
 export default {
   id: 'video-editor',
   name: 'Video Editor',
+  seoTitle: 'Free Online Video Editor - Cut & Trim Video in Browser | phil.tf',
   category: 'Video',
   description: 'Timeline-based video editor - cut, trim, and export entirely in your browser.',
   guide: `## Video Editor - Free Browser-Based Video Trimmer and Cutter

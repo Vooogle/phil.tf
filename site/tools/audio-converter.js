@@ -13,6 +13,7 @@ function isAudio(file) {
 export default {
   id: 'audio-converter',
   name: 'Audio Converter',
+  seoTitle: 'Free Audio Converter Online - MP3 WAV OGG FLAC AAC Opus | phil.tf',
   category: 'Media',
   description: 'Convert audio between MP3, WAV, OGG, FLAC, AAC, and Opus.',
   guide: `## Audio Converter - Free Browser-Based Audio Format Conversion
